@@ -1,0 +1,96 @@
+<body style="background-image: url('bg.png'); background-size: 100% 100%;">
+	<script src="/socket.io/socket.io.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+	<script>
+		var socket = io.connect('http://localhost:8080');
+		var user;
+		var bot = true;
+		var clientroom;
+		var username = 'Thomas';
+		// on connection to server, ask for user's name with an anonymous callback
+		socket.on('connect', function(){
+			// call the server-side function 'adduser' and send one parameter (value of prompt)
+			socket.emit('adduser', username);
+		});
+
+		// listener, whenever the server emits 'updatechat', this updates the chat body
+		socket.on('updatechat', function (role, data) {
+			if (role ==='client') {
+				user = 'client';
+			} else {
+				user = 'server';
+			}
+			$('#conversation').append('<div class="' + user + '">' + data + '</div>');
+		});
+
+		// listener, whenever the server emits 'updaterooms', this updates the room the client is in
+		socket.on('updaterooms', function(rooms, current_room, names, roles) {
+			$('#rooms').empty();
+			$.each(rooms, function(key, value) {
+				if(value == current_room){
+					$('#rooms').append('<div>' + value + '</div>');
+				}
+				else {
+					$('#rooms').append('<div><a href="#" onclick="switchRoom(\''+value+'\')">' + value + '</a></div>');
+				}
+			});
+		});
+
+		// get room from server side.
+		socket.on('getroom', function(current_room) {
+			clientroom = current_room;
+		});
+
+		function switchRoom(room){
+			socket.emit('switchRoom', room);
+		}
+
+		// on load of page
+		$(function(){
+			// when the client clicks SEND
+			$('#datasend').click( function() {
+				var message = $('#data').val();
+				$('#data').val('');
+
+				// tell server to execute 'sendchat' and send along one parameter
+			console.log(message + '-----------');
+			console.log(clientroom + '-----------');
+				socket.emit('sendchat', message, clientroom);
+			});
+
+			// when the client hits ENTER on their keyboard
+			$('#data').keypress(function(e) {
+				if(e.which == 13) {
+					$(this).blur();
+					$('#datasend').focus().click();
+				}
+			});
+		});
+
+	</script>
+	<style>
+		.chatbot {
+			background: #fff;
+		    position: fixed;
+		    z-index: 9999;
+		    bottom: 0;
+		    right: 20px;
+		    margin-bottom: 0!important;
+		    width: 330px;
+		    padding: 0!important;
+		    box-shadow: 0px 1px 8px #aab2bd!important;
+		}
+		#conversation .client {
+			background: #f4f2f2;
+			text-align: right;
+		}
+		#conversation .server {
+			background: #fff5e6;
+		}
+	</style>
+	<div class="chatbot" style="float:left;width:300px;height:250px;overflow:scroll-y;padding:10px;">
+		<div id="conversation"></div>
+		<input id="data" style="width:200px;" />
+		<input type="button" id="datasend" value="send" />
+	</div>
+</body>

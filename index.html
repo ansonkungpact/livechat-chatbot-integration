@@ -1,0 +1,164 @@
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.4/jquery.min.js"></script>
+<script>
+	var socket = io.connect('http://localhost:8080');
+	var chatUsername;
+	var room;
+
+	// on connection to server, ask for user's name with an anonymous callback
+	socket.on('connect', function(){
+		// call the server-side function 'adduser' and send one parameter (value of prompt)
+		socket.emit('adduser', prompt("What's your name?"));
+	});
+
+	// listener, whenever the server emits 'updatechat', this updates the chat body
+	socket.on('updatechat', function (role, data, timestamp) {
+		var date = new Date(timestamp);
+		$('#conversation').append('<div class="chat-item ' + role +'"><div class="info"><span class="role">' + role + '</span><span class="timestamp">' + date + '</span></div><div class="message">' + data + '</div></div>');
+	});
+
+	// listener, whenever the server emits 'updaterooms', this updates the room the client is in
+	socket.on('updaterooms', function(rooms, current_room, names, roles, chathistory) {
+		$('#rooms').empty();
+		$('#conversation').html('');
+		$.each(rooms, function(key, value) {
+			if(value == current_room){
+				$('#rooms').append('<div class="room active">' + names[key] + '</div>');
+				chatUsername = names[key];
+				room = current_room;
+			}
+			else {
+				$('#rooms').append('<div class="room"><a href="#" onclick="switchRoom(\''+value+'\')">' + names[key] + '</a></div>');
+			}
+		});
+		$.each(chathistory, function(key, value) {
+			var date = new Date(value.timestamp);
+			$('#conversation').append('<div class="chat-item ' + value.role +'"><div class="info"><span class="role">' + value.role + '</span><span class="timestamp">' + date + '</span></div><div class="message">' + value.message + '</div></div>');
+		});
+	});
+
+	// get the start chat request
+	socket.on('start', function(ID) {
+		console.log('----------------');
+		console.log(ID);
+		console.log('----------------');
+	});
+
+	function switchRoom(room){
+		socket.emit('switchRoom', room);
+	}
+	
+	// on load of page
+	$(function(){
+		$('.send-message-wrapper').hide();
+		$('.jumpout').hide();
+
+		// when the client clicks SEND
+		$('#datasend').click( function() {
+			var message = $('#data').val();
+			$('#data').val('');
+			// tell server to execute 'sendchat' and send along one parameter
+			socket.emit('sendchat', message, room);
+		});
+
+		// jump in
+		$('.jumpin').click( function() {
+			console.log('--------------------');
+			console.log(room);
+			console.log('--------------------');
+			socket.emit('setBot', room, false);
+			socket.emit('startchat', chatUsername, room);
+			$('.jumpin').hide();
+			$('.jumpout').show();
+		});
+
+		// jump in
+		$('.jumpout').click( function() {
+			socket.emit('setBot', room, true);
+			$('.send-message-wrapper').hide();
+			$('.jumpin').show();
+			$('.jumpout').hide();
+		});
+
+		// when the client hits ENTER on their keyboard
+		$('#data').keypress(function(e) {
+			if(e.which == 13) {
+				$(this).blur();
+				$('#datasend').focus().click();
+			}
+		});
+	});
+
+</script>
+<style>
+	body {
+		margin: 0;
+	}
+	.conversation-wrapper {
+		float: left;    
+		width: 80%;
+	    overflow: scroll;
+    	height: 100%;
+	}
+	#conversation .role {
+		float: left;
+	}
+	#conversation .timestamp {
+		float: right;
+	}
+	#conversation .message {
+	    display: block;
+	    clear: both;
+	}
+	#conversation .client {
+		background: #f4f2f2;
+		text-align: right;
+	}
+	#conversation .agent, #conversation .bot {
+		background: #fff5e6;
+	}
+	#conversation .chat-item {
+		padding: 3px 10px;
+	}
+	#rooms-wrapper {
+		float: left;
+	    width: 20%;
+        height: 100%;
+        background: #d5d5d5;
+        overflow: scroll;
+	}
+	.rooms-wrapper-title {
+	    padding: 10px 20px;
+	    border-bottom: 1px solid;
+	}
+	.rooms-wrapper-title {
+		background: #333;
+		color: white;
+	}
+	#rooms .room {
+	    display: block;
+	    padding: 0;
+	}
+	#rooms .room.active {
+		padding: 10px 20px;
+		background: #ffa723;
+	}
+	#rooms .room > a{
+	    display: block;
+		padding: 10px 20px;
+	}
+
+</style>
+<div id="rooms-wrapper">
+	<div class="rooms-wrapper-title">Conversations</div>
+	<div id="rooms"></div>
+</div>
+<div class="conversation-wrapper">
+	<div id="conversation"></div>
+	<input type="button" class="jumpin" value="jump in" /><br />
+	<input type="button" class="jumpout" value="jump out" /><br />
+	<div class="send-message-wrapper">
+		<input id="data" style="width:200px;" />
+		<input type="button" id="datasend" value="send" />
+	</div>
+</div>
